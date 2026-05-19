@@ -11,8 +11,10 @@ on:
       semver:
         description: 'Version'
         required: true
+
 permissions:
   contents: write
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
@@ -29,9 +31,33 @@ jobs:
       - name: Run a multi-line script
         run: | 
           # pwd debug
-          tar -cvzf unlocker.tgz etc
+          if [ -d "etc" ]; then
+            tar -cvzf unlocker.tgz etc
+          else
+            echo "Warning: etc directory not found"
+          fi
           tar -cvzf esxi-unlocker-${{ github.event.inputs.semver }}.tgz *.*
           # ls -al more debug
+          echo "PACKAGE_NAME=esxi-unlocker-${{ github.event.inputs.semver }}.tgz" >> $GITHUB_ENV
+
+      # 上传 Artifact - 用于在 workflow 运行期间下载
+      - name: Upload artifacts (for download during run)
+        uses: actions/upload-artifact@v4
+        with:
+          name: esxi-unlocker-packages
+          path: |
+            ./esxi-unlocker-*.tgz
+            ./unlocker.tgz
+            ./readme.md
+          retention-days: 90  # 保留90天，默认是90天
+
+      # 单独上传主包（可选，方便单独下载）
+      - name: Upload main package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: esxi-unlocker-${{ github.event.inputs.semver }}
+          path: ./esxi-unlocker-${{ github.event.inputs.semver }}.tgz
+          retention-days: 90
 
       # release automation.gz
       - name: Create Release
@@ -48,6 +74,7 @@ jobs:
 #             - Second Change
           draft: true
           prerelease: true
+          
       - name: Upload Release Asset
         id: upload-release-asset
         uses: actions/upload-release-asset@v1
@@ -58,6 +85,7 @@ jobs:
           asset_path: ./readme.md
           asset_name: readme.md
           asset_content_type: text/plain 
+          
       - name: Upload Release Asset2
         id: upload-release-asset2
         uses: actions/upload-release-asset@v1
@@ -67,4 +95,4 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./esxi-unlocker-${{ github.event.inputs.semver }}.tgz
           asset_name: esxi-unlocker-${{ github.event.inputs.semver }}.tgz
-          asset_content_type: application/zip 
+          asset_content_type: application/gzip  # 修正为正确的 MIME 类型
